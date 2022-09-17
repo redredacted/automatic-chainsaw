@@ -1,4 +1,4 @@
-use clap::{arg, command, Command};
+use clap::{Parser, Subcommand};
 use serde_json::value;
 use surrealdb::Datastore;
 use surrealdb::Error;
@@ -11,31 +11,46 @@ struct TodoTask {
     title: String,
 }
 
+#[derive(Parser)]
+#[clap(author, version, about, long_about = None)]
+#[clap(propagate_version = true)]
+struct Cli {
+    #[clap(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+   Todo {
+        #[clap(subcommand)]
+        command: TodoCommands,
+   }
+}
+
+#[derive(Subcommand)]
+enum TodoCommands {
+   Add {
+       #[clap(value_parser)]
+       title: String,
+   },
+   List,
+}
+
 #[tokio::main]
 async fn main() {
-    let matches = command!()
-        .propagate_version(true)
-        .subcommand_required(true)
-        .arg_required_else_help(true)
-        .subcommand(
-            Command::new("add")
-                .about("Adds files to myapp")
-                .arg(arg!([TITLE]))
-        )
-        .subcommand(
-            Command::new("list")
-                .about("lists todo records")
-        )
-        .get_matches();
+    let cli = Cli::parse();
 
-    match matches.subcommand() {
-        Some(("add", sub_matches)) => _ = add(sub_matches.get_one::<String>("TITLE").unwrap_or(&String::from(""))).await,
-        Some(("list", _)) => _ = list().await, 
-        _ => unreachable!("no matching commands try --help"),
+    match &cli.command {
+        Commands::Todo { command } => {
+            match command {
+                TodoCommands::Add { title } => _ = add(title).await,
+                TodoCommands::List => _ = list().await,
+            }
+        }, 
     }
 }
 
-async fn add(title: &str) -> Result<(), Error> {
+async fn add(title: &String) -> Result<(), Error> {
     let ds = Datastore::new("file://todo.db").await?;
     let ses = Session::for_kv();
     let ast = format!("USE NS todo DB todo; CREATE task SET title = '{}'", title);
