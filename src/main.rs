@@ -6,6 +6,7 @@ use surrealdb::Session;
 use surrealdb::sql::Value;
 use serde::{Serialize, Deserialize};
 use map_macro::btree_map;
+use chrono::{DateTime, Local};
 
 const DB_FILE: &str = "file://todo.db";
 
@@ -14,6 +15,7 @@ struct TodoTask {
     id: String,
     title: String,
     description: Option<String>,
+    created_at: DateTime<Local>,
 }
 
 #[derive(Parser)]
@@ -60,7 +62,7 @@ async fn main() {
 async fn add(title: &str, description: &Option<String>) -> Result<(), Error> {
     let ds = Datastore::new(DB_FILE).await?;
     let ses = Session::for_kv();
-    let ast = String::from("USE NS todo DB todo; CREATE task SET title = $title, description = $description");
+    let ast = String::from("USE NS todo DB todo; CREATE task SET title = $title, description = $description, created_at = time::now()");
 
     let mut vars = btree_map! {
         String::from("title") => Value::from(title),
@@ -96,7 +98,7 @@ async fn list() -> Result<(), Error> {
     }
 
     for todo in tasks {
-        println!("TodoId: {}, Title: {}, Description: {}", todo.id, todo.title, todo.description.unwrap_or_else(|| String::from("")))
+        println!("TodoId: {}, Title: {}, Description: {}, created_at: {}", todo.id, todo.title, todo.description.unwrap_or_else(|| String::from("")), todo.created_at)
     }
 
     Ok(())
